@@ -3,6 +3,9 @@ from dotenv import load_dotenv
 from typing import List, Dict
 from langchain.tools import tool
 from serpapi import GoogleSearch
+import weatherapi
+from weatherapi.rest import ApiException
+import time
 
 load_dotenv()   
 
@@ -50,3 +53,41 @@ def find_bike_rentals(city: str, locality: str="") -> List[Dict]:
         }
         return_details.append(details)
     return return_details
+
+
+@tool
+def get_weather_now(city: str) -> str:
+    """Get the current weather for a given city. This is a specific tool for real-time weather information.
+    Args:
+        city (str): The city to get the weather for.
+    Returns:
+        str: A string describing the current weather in a specific location.
+    """
+    configuration = weatherapi.Configuration()
+    configuration.api_key['key'] = os.getenv("WEATHERAPI_KEY")
+
+    api_instance = weatherapi.APIsAPI(weatherapi.ApiClient(configuration))
+    try:
+        api_response = api_instance.get_current_weather(q=city)
+    except ApiException as e:
+        raise RuntimeError(f"get_weather function failed for {city}: {e}")
+   
+    condition = api_response.current.condition.text
+    temp_c = api_response.current.temp_c
+    humidity = api_response.current.humidity
+    wind_kph = api_response.current.wind_kph
+
+    return (f"The current weather in {city} is {condition} with a temperature of "
+             f"{temp_c}°C, humidity at {humidity}%, and wind speed of {wind_kph} kph.")
+
+
+@tool
+def get_weather_forecast(city: str, days: int=3) -> str:
+    """Get the weather forecast for a given city for the next specified number of days.
+    Args:
+        city (str): The city to get the weather forecast for.
+        days (int, optional): Number of days to forecast. Defaults to 3.
+    Returns:
+        str: A string describing the weather forecast.
+    """
+    pass
