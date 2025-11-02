@@ -11,7 +11,7 @@ from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from langchain.agents import create_agent
 
 from ..models.azure_openai_models import get_azure_openai_model
-from ..tools.tools import find_bike_rentals
+from ..tools.tools import find_bike_rentals, get_weather_now, get_weather_forecast
 from ..prompts.system_prompt import agent_system_prompt, advanced_agent_system_prompt
 
 load_dotenv()
@@ -65,6 +65,15 @@ class ConversationalCyclingAgent:
                 return ChatGoogleGenerativeAI(model="gemini-pro")
             except ImportError:
                 raise ImportError("Install langchain-google-genai to use Google models")
+        elif provider == "ollama":
+            try:
+                from ..models.open_source_models import get_ollama_model
+                # Use a function-calling compatible model by default
+                model_name = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+                return get_ollama_model(model_name, chat=True)
+            except ImportError:
+                raise ImportError("Install langchain-ollama to use Ollama models: pip install langchain-ollama")
+
         else:
             raise ValueError(f"Unsupported model provider: {provider}")
     
@@ -79,7 +88,7 @@ class ConversationalCyclingAgent:
         
         return create_agent(
             self.model,
-            tools=[find_bike_rentals],
+            tools=[find_bike_rentals, get_weather_now, get_weather_forecast],
             system_prompt=advanced_agent_system_prompt()
         )
     
