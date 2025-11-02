@@ -82,7 +82,7 @@ def get_weather_now(city: str) -> str:
 
 
 @tool
-def get_weather_forecast(city: str, days: int=3) -> str:
+def get_weather_forecast(city: str, days: int=3) -> List[str]:
     """Get the weather forecast for a given city for the next specified number of days.
     Args:
         city (str): The city to get the weather forecast for.
@@ -90,4 +90,26 @@ def get_weather_forecast(city: str, days: int=3) -> str:
     Returns:
         str: A string describing the weather forecast.
     """
-    pass
+    configuration = weatherapi.Configuration()
+    configuration.api_key['key'] = os.getenv("WEATHERAPI_KEY")
+
+    api_instance = weatherapi.APIsAPI(weatherapi.ApiClient(configuration))
+    try:
+        api_response = api_instance.get_forecast_weather(q=city, days=days)
+    except ApiException as e:
+        raise RuntimeError(f"get_weather_forecast function failed for {city}: {e}")
+    
+    forecast_strings = []
+    for day in api_response.forecast.forecastday:
+        date = day.date
+        condition = day.day.condition.text
+        max_temp = day.day.maxtemp_c
+        min_temp = day.day.mintemp_c
+        chance_of_rain = day.day.daily_chance_of_rain
+
+        forecast_strings.append(
+            f"On {date}, expect {condition} with a high of {max_temp}°C and a low of {min_temp}°C. "
+            f"Chance of rain: {chance_of_rain}%."
+        )
+        time.sleep(1)  # To avoid hitting rate limits  
+    return forecast_strings
