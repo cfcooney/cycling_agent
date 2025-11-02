@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from typing import List, Dict
-from langchain.tools import tool
+from langchain.tools import tool, BaseTool
 from serpapi import GoogleSearch
 import requests
 import time
@@ -146,3 +146,52 @@ def get_weather_forecast(city: str, days: int=3) -> List[str]:
         raise RuntimeError(f"Weather forecast API request failed for {city}: {e}")
     except KeyError as e:
         raise RuntimeError(f"Unexpected weather forecast API response format: {e}")
+
+
+
+class UserStravaRoutesTool(BaseTool):
+    """Tool to get user's Strava routes. Currently requires valid access token and only enables access to athletes routes."""
+    name: str = "user_strava_routes"
+    description: str = (
+        "Get a list of the user's Strava routes. Returns the name, ID, distance (in km), and elevation gain (in meters) of each route. "
+        "Requires a valid Strava access token. "
+    )
+    
+    # Declare all fields with type annotations
+    access_token: str = ""
+    max_routes: int = 5
+    
+    def __init__(self, max_routes: int = 5, **kwargs):
+        # Initialize the parent class first
+        super().__init__(**kwargs)
+        # Set field values
+        self.access_token = os.getenv("STRAVA_ACCESS_TOKEN", "")
+        self.max_routes = max_routes
+    
+    @property
+    def headers(self) -> Dict[str, str]:
+        return {"Authorization": f"Bearer {self.access_token}"}
+    
+    @property
+    def url(self) -> str:
+        return "https://www.strava.com/api/v3/athlete/routes"
+
+    def _run(self, query: str = "") -> List[Dict]:
+        if not self.access_token:
+            raise ValueError("STRAVA_ACCESS_TOKEN environment variable is required")
+            
+        params = {"per_page": self.max_routes}
+        response = requests.get(self.url, headers=self.headers, params=params)
+        response.raise_for_status()
+        routes = response.json()
+        if not routes:
+            return [{"message": "No routes found for the user."}]
+        result = []
+        for r in routes:
+            result.append({
+                "name": r["name"],
+                "id": r["id"],
+                "distance_km": f"{r['distance']/1000:.1f} km",
+                "elevation_m": f"{r['elevation_gain']} m"
+            })
+        return result

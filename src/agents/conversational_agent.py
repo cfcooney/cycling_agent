@@ -11,7 +11,7 @@ from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from langchain.agents import create_agent
 
 from ..models.azure_openai_models import get_azure_openai_model
-from ..tools.tools import find_bike_rentals, get_weather_now, get_weather_forecast
+from ..tools.tools import find_bike_rentals, get_weather_now, get_weather_forecast, UserStravaRoutesTool
 from ..prompts.system_prompt import agent_system_prompt, advanced_agent_system_prompt
 
 load_dotenv()
@@ -34,6 +34,9 @@ class ConversationalCyclingAgent:
         self.model_provider = model_provider
         self.history = InMemoryHistory()
         self.conversation_history = []
+        
+        # Initialize tools
+        self.user_strava_routes_tool = UserStravaRoutesTool(max_routes=5)
         
         # Initialize model and agent
         self.model = self._get_model(model_provider)
@@ -85,10 +88,9 @@ class ConversationalCyclingAgent:
             The initialized agent
         """
        
-        
         return create_agent(
             self.model,
-            tools=[find_bike_rentals, get_weather_now, get_weather_forecast],
+            tools=[find_bike_rentals, get_weather_now, get_weather_forecast, self.user_strava_routes_tool],
             system_prompt=advanced_agent_system_prompt()
         )
     
