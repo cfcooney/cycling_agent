@@ -1,10 +1,18 @@
 import os
+import requests
+import time
+import json
+import ollama
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from typing import List, Dict
 from langchain.tools import tool, BaseTool
 from serpapi import GoogleSearch
-import requests
-import time
+from bs4 import BeautifulSoup
+from pydantic.v1 import BaseModel, Field
+from typing import Optional, List
+from prompts.extraction_prompt import get_climb_extraction_prompt
+
 
 load_dotenv()   
 
@@ -195,3 +203,106 @@ class UserStravaRoutesTool(BaseTool):
                 "elevation_m": f"{r['elevation_gain']} m"
             })
         return result
+    
+
+@tool
+def find_cycling_climb_articles(location: str, radius_km: int = 50) -> List[str]:
+    """Find cycling climbs near a specified geographic location.
+    Args:
+        location (str): The geographic location to search near (e.g., city name or coordinates).
+        radius_km (int, optional): The search radius in kilometers. Defaults to 50 km.
+    Returns:
+        List[str]: A list of URLs to articles about cycling climbs near the specified location.
+    """
+    if not os.getenv("SERPAPI_KEY"):
+        return ["SERPAPI_KEY environment variable not set."]
+    
+    params = {
+        "engine": "google",  # Use the general Google search engine
+        "q": f"famous cycling climbs within {radius_km} km of {location} stats",
+        "api_key": os.getenv("SERPAPI_KEY")
+    }
+    search = GoogleSearch(params)
+    results = search.get_dict()
+
+    organic_results = results.get("organic_results", [])
+    if not organic_results:
+        return [f"No search results found for cycling climbs near {location}."]
+
+    
+    return [result["link"] for result in organic_results[:3] if "link" in result]
+
+
+class Climb(BaseModel):
+    name: str = Field(description="Name of the climb")
+    location: Optional[str] = Field(description="Location of the climb")
+    distance_km: Optional[float] = Field(description="Distance of the climb in kilometers")
+    elevation_gain_m: Optional[int] = Field(description="Elevation gain of the climb in meters")
+    average_gradient: Optional[float] = Field(description="Average gradient of the climb in percentage")
+    max_gradient: Optional[float] = Field(default=None,
+                                          description="Maximum gradient of the climb in percentage")
+    
+class ClimbList(BaseModel):
+    climbs: List[Climb]
+
+@tool
+def scrape_and_extract_climb_stats(url: str) -> List[dict]:
+    """Scrape a webpage for cycling climb statistics and extract structured data
+    using a LLM prompted for this task.
+    
+    Args:
+        url (str): The URL of the webpage to scrape.
+    
+        Returns: List[dict]: A list of dictionaries containing climb statistics.
+    """
+    # 1. Scrape the webpage content
+    try:
+        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Remove script and style elements
+        for script_or_style in soup(["script", "style"]):
+            script_or_style.decompose()
+            
+        text_content = soup.get_text(separator=' ', strip=True)
+        # Limit content size to avoid excessive token usage
+        text_content = text_content[:8000]
+
+    except requests.RequestException as e:
+        return [f"Error fetching URL: {e}"]
+
+    prompt = get_climb_extraction_prompt(
+        schema=ClimbList.schema_json(indent=2),
+        webpage_text=text_content
+    )
+    
+    # --- Call Ollama ---
+    response = ollama.chat(
+        model="mistral",
+        messages=[{"role": "user", "content": prompt}]
+        )
+    output = response["message"]["content"].strip()
+    
+    try:
+        data = json.loads(output)
+
+        # Handle full schema wrapper if present
+        if "properties" in data and "climbs" in data["properties"]:
+            climbs_data = data["properties"]["climbs"]
+        elif "climbs" in data:
+            climbs_data = data["climbs"]
+        else:
+            # fallback if output structure is unexpected
+            climbs_data = []
+
+        # Convert each climb dict to Climb model (handles optional fields)
+        climbs_validated = [Climb(**c).dict() for c in climbs_data]
+
+        return climbs_validated
+
+    except json.JSONDecodeError:
+        # If parsing fails, return raw output for inspection
+        return ["Error parsing JSON from LLM output", output]
+
+

@@ -1,6 +1,7 @@
 import os
 from langchain_ollama import ChatOllama, OllamaLLM
 from typing import Optional, Union 
+import ollama
 
 def get_ollama_model(model_name: str, chat: bool = True) -> Optional[Union[ChatOllama, OllamaLLM]]:
     """Returns an Ollama model instance based on the model name.
