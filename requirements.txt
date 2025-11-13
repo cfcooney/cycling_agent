@@ -1,8 +1,11 @@
 # Core dependencies
-langchain>=0.1.0
-langchain-community>=0.0.20
-langchain-openai>=0.0.5
 python-dotenv>=1.0.0
+# Core LangChain packages
+langchain==0.3.8
+langchain-core==0.3.22
+langchain-community==0.3.7
+langchain-openai==0.2.9
+langchain-text-splitters==0.3.1
 
 # API clients
 openai>=1.0.0
@@ -15,17 +18,12 @@ rich>=13.0.0
 prompt-toolkit>=3.0.0
 
 # Local/Open-source model support
-# For Ollama (recommended for Llama2)
-# ollama  # Install separately: pip install ollama
-langchain-ollama
-# For HuggingFace Transformers (if running models locally)
-# transformers>=4.35.0
-# torch>=2.0.0
-# accelerate>=0.20.0
+langchain-ollama>=0.1.0
 
 # Utilities
 pydantic>=2.0.0
 requests>=2.31.0
+beautifulsoup4>=4.12.3 # For web scraping
 
 # Development dependencies
 pytest>=7.4.0
