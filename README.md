@@ -6,6 +6,8 @@ A conversational AI assistant specializing in cycling advice, bike rentals, weat
 
 - 🚴 **Bike Rental Search**: Find bike shops and rentals in any city
 - 🌤️ **Weather Information**: Current weather and forecasts for cycling planning
+- ⛰️ **Find Cycling Climbs**: Scrapes the web for articles and extracts details on local climbs
+-  Strava Integration: Pull your latest routes from Strava
 - 💬 **Conversational Interface**: Rich command-line chat with history and commands
 - 🌐 **Multi-Model Support**: Works with Azure OpenAI, Ollama (Llama models), and more
 - 🔧 **Tool Integration**: Uses real-time APIs for factual information
