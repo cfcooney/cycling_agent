@@ -247,13 +247,28 @@ class ClimbList(BaseModel):
 
 @tool
 def scrape_and_extract_climb_stats(url: str) -> List[dict]:
-    """Scrape a webpage for cycling climb statistics and extract structured data
-    using a LLM prompted for this task.
+    """Extract detailed climb statistics from ONE webpage URL at a time.
+    
+    CRITICAL: This tool accepts ONLY ONE url parameter (a single string), NOT multiple URLs.
+    You must call this tool separately for each URL you want to scrape.
+    
+    Use this tool AFTER find_cycling_climb_articles returns URLs. For example:
+    - If find_cycling_climb_articles returns 3 URLs
+    - Call this tool 3 times (once per URL)
+    
+    This extracts structured cycling climb data:
+    - Climb names
+    - Distances in kilometers  
+    - Elevation gain in meters
+    - Average and maximum gradient percentages
     
     Args:
-        url (str): The URL of the webpage to scrape.
+        url (str): A SINGLE webpage URL string (e.g., 'https://example.com/climbs')
+                  NOT a list like ['url1', 'url2']
     
-        Returns: List[dict]: A list of dictionaries containing climb statistics.
+    Returns: 
+        List[dict]: Climb dictionaries with keys: name, location, distance_km, 
+                   elevation_gain_m, average_gradient, max_gradient
     """
     # 1. Scrape the webpage content
     try:

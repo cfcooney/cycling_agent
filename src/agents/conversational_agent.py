@@ -8,10 +8,12 @@ from rich.text import Text
 from prompt_toolkit import prompt
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
-from langchain.agents import create_agent
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from ..models.azure_openai_models import get_azure_openai_model
-from ..tools.tools import find_bike_rentals, get_weather_now, get_weather_forecast, UserStravaRoutesTool
+from ..tools.tools import (find_bike_rentals, get_weather_now, get_weather_forecast,
+                           UserStravaRoutesTool, find_cycling_climb_articles, scrape_and_extract_climb_stats)
 from ..prompts.system_prompt import agent_system_prompt, advanced_agent_system_prompt
 
 load_dotenv()
@@ -82,16 +84,37 @@ class ConversationalCyclingAgent:
     
     def _create_agent(self):
         """
-        Create the agent using your existing approach.
+        Create the agent using the new LangChain API.
         
         Returns:
-            The initialized agent
+            The initialized agent executor
         """
-       
-        return create_agent(
-            self.model,
-            tools=[find_bike_rentals, get_weather_now, get_weather_forecast, self.user_strava_routes_tool],
-            system_prompt=advanced_agent_system_prompt()
+        tools = [
+            find_bike_rentals,
+            get_weather_now,
+            get_weather_forecast,
+            find_cycling_climb_articles,
+            scrape_and_extract_climb_stats,
+            self.user_strava_routes_tool
+        ]
+        
+        # Create a simpler prompt template for tool calling agents
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", advanced_agent_system_prompt()),
+            MessagesPlaceholder(variable_name="chat_history", optional=True),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad")
+        ])
+        
+        # Create the tool calling agent (works better with OpenAI models)
+        agent = create_tool_calling_agent(self.model, tools, prompt)
+        
+        # Create and return the agent executor
+        return AgentExecutor(
+            agent=agent,
+            tools=tools,
+            verbose=True,
+            handle_parsing_errors=True
         )
     
     def _extract_response_content(self, response: Any) -> str:
@@ -247,15 +270,25 @@ class ConversationalCyclingAgent:
             The agent's response or None if there was an error
         """
         try:
-            # Create messages with conversation history
-            messages = self.create_messages_with_history(user_input)
+            # Convert conversation history to chat_history format
+            chat_history = []
+            for msg in self.conversation_history:
+                role = msg['role']
+                content = msg['content']
+                if role == 'user':
+                    chat_history.append(("human", content))
+                elif role == 'assistant':
+                    chat_history.append(("ai", content))
             
             # Show thinking indicator
             with self.console.status("[bold green]🤔 Thinking...", spinner="dots"):
-                response = self.agent.invoke({"messages": messages})
+                response = self.agent.invoke({
+                    "input": user_input,
+                    "chat_history": chat_history
+                })
             
-            # Extract response content
-            agent_response = self._extract_response_content(response)
+            # Extract response content from the new response format
+            agent_response = response.get('output', str(response))
             
             return agent_response
             
