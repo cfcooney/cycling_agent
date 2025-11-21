@@ -1,4 +1,3 @@
-
 def get_climb_extraction_prompt(schema: str, webpage_text: str) -> str:
     """
     Returns a formatted prompt for extracting climb data using the given schema and text.

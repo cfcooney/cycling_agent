@@ -9,15 +9,15 @@ from typing import List, Dict
 from langchain.tools import tool, BaseTool
 from serpapi import GoogleSearch
 from bs4 import BeautifulSoup
-from pydantic.v1 import BaseModel, Field
-from typing import Optional, List
+from typing import Optional
 from prompts.extraction_prompt import get_climb_extraction_prompt
 
 
-load_dotenv()   
+load_dotenv()
+
 
 @tool
-def find_bike_rentals(city: str, locality: str="") -> List[Dict]:
+def find_bike_rentals(city: str, locality: str = "") -> List[Dict]:
     """Find bike rental shops in a given location.
     Args:
         city (str): The city to search in.
@@ -30,14 +30,13 @@ def find_bike_rentals(city: str, locality: str="") -> List[Dict]:
     api_key = os.getenv("SERPAPI_KEY")
     if not api_key:
         raise ValueError("Missing SERPAPI_API_KEY environment variable")
-    
 
     params = {
         "engine": "google_maps",
         "q": f"{location} bike rental",
         "location": location,
         "api_key": api_key,
-        "num": 3
+        "num": 3,
     }
     search = GoogleSearch(params)
     results = search.get_dict()
@@ -73,30 +72,28 @@ def get_weather_now(city: str) -> str:
     api_key = os.getenv("WEATHERAPI_KEY")
     if not api_key:
         raise ValueError("Missing WEATHERAPI_KEY environment variable")
-    
+
     try:
         # Using WeatherAPI.com (free tier available)
         url = "http://api.weatherapi.com/v1/current.json"
-        params = {
-            "key": api_key,
-            "q": city,
-            "aqi": "no"
-        }
-        
+        params = {"key": api_key, "q": city, "aqi": "no"}
+
         response = requests.get(url, params=params)
         response.raise_for_status()
         data = response.json()
-        
-        location = data['location']['name']
-        country = data['location']['country']
-        condition = data['current']['condition']['text']
-        temp_c = data['current']['temp_c']
-        humidity = data['current']['humidity']
-        wind_kph = data['current']['wind_kph']
-        
-        return (f"The current weather in {location}, {country} is {condition} with a temperature of "
-                f"{temp_c}°C, humidity at {humidity}%, and wind speed of {wind_kph} kph.")
-                
+
+        location = data["location"]["name"]
+        country = data["location"]["country"]
+        condition = data["current"]["condition"]["text"]
+        temp_c = data["current"]["temp_c"]
+        humidity = data["current"]["humidity"]
+        wind_kph = data["current"]["wind_kph"]
+
+        return (
+            f"The current weather in {location}, {country} is {condition} with a temperature of "
+            f"{temp_c}°C, humidity at {humidity}%, and wind speed of {wind_kph} kph."
+        )
+
     except requests.RequestException as e:
         raise RuntimeError(f"Weather API request failed for {city}: {e}")
     except KeyError as e:
@@ -104,7 +101,7 @@ def get_weather_now(city: str) -> str:
 
 
 @tool
-def get_weather_forecast(city: str, days: int=3) -> List[str]:
+def get_weather_forecast(city: str, days: int = 3) -> List[str]:
     """Get the weather forecast for a given city for the next specified number of days.
     Args:
         city (str): The city to get the weather forecast for.
@@ -115,71 +112,65 @@ def get_weather_forecast(city: str, days: int=3) -> List[str]:
     api_key = os.getenv("WEATHERAPI_KEY")
     if not api_key:
         raise ValueError("Missing WEATHERAPI_KEY environment variable")
-    
+
     # Limit days to API constraints (usually max 10 days for free tier)
     days = min(days, 7)
-    
+
     try:
         # Using WeatherAPI.com forecast endpoint
         url = "http://api.weatherapi.com/v1/forecast.json"
-        params = {
-            "key": api_key,
-            "q": city,
-            "days": days,
-            "aqi": "no",
-            "alerts": "no"
-        }
-        
+        params = {"key": api_key, "q": city, "days": days, "aqi": "no", "alerts": "no"}
+
         response = requests.get(url, params=params)
         response.raise_for_status()
         data = response.json()
-        
+
         forecast_strings = []
-        for day in data['forecast']['forecastday']:
-            date = day['date']
-            condition = day['day']['condition']['text']
-            max_temp = day['day']['maxtemp_c']
-            min_temp = day['day']['mintemp_c']
-            chance_of_rain = day['day']['daily_chance_of_rain']
-            
+        for day in data["forecast"]["forecastday"]:
+            date = day["date"]
+            condition = day["day"]["condition"]["text"]
+            max_temp = day["day"]["maxtemp_c"]
+            min_temp = day["day"]["mintemp_c"]
+            chance_of_rain = day["day"]["daily_chance_of_rain"]
+
             forecast_strings.append(
                 f"On {date}, expect {condition} with a high of {max_temp}°C and a low of {min_temp}°C. "
                 f"Chance of rain: {chance_of_rain}%."
             )
             time.sleep(0.1)  # Small delay to be respectful to the API
-            
+
         return forecast_strings
-        
+
     except requests.RequestException as e:
         raise RuntimeError(f"Weather forecast API request failed for {city}: {e}")
     except KeyError as e:
         raise RuntimeError(f"Unexpected weather forecast API response format: {e}")
 
 
-
 class UserStravaRoutesTool(BaseTool):
     """Tool to get user's Strava routes. Currently requires valid access token and only enables access to athletes routes."""
+
     name: str = "user_strava_routes"
     description: str = (
         "Get a list of the user's Strava routes. Returns the name, ID, distance (in km), and elevation gain (in meters) of each route. "
         "Requires a valid Strava access token. "
     )
-    
+
     # Declare all fields with type annotations
     access_token: str = ""
     max_routes: int = 5
-    
+
     def __init__(self, max_routes: int = 5, **kwargs):
         # Initialize the parent class first
         super().__init__(**kwargs)
         # Set field values
         self.access_token = os.getenv("STRAVA_ACCESS_TOKEN", "")
         self.max_routes = max_routes
-    
+
     @property
     def headers(self) -> Dict[str, str]:
         return {"Authorization": f"Bearer {self.access_token}"}
-    
+
     @property
     def url(self) -> str:
         return "https://www.strava.com/api/v3/athlete/routes"
@@ -187,7 +178,7 @@ class UserStravaRoutesTool(BaseTool):
     def _run(self, query: str = "") -> List[Dict]:
         if not self.access_token:
             raise ValueError("STRAVA_ACCESS_TOKEN environment variable is required")
-            
+
         params = {"per_page": self.max_routes}
         response = requests.get(self.url, headers=self.headers, params=params)
         response.raise_for_status()
@@ -196,14 +187,16 @@ class UserStravaRoutesTool(BaseTool):
             return [{"message": "No routes found for the user."}]
         result = []
         for r in routes:
-            result.append({
-                "name": r["name"],
-                "id": r["id"],
-                "distance_km": f"{r['distance']/1000:.1f} km",
-                "elevation_m": f"{r['elevation_gain']} m"
-            })
+            result.append(
+                {
+                    "name": r["name"],
+                    "id": r["id"],
+                    "distance_km": f"{r['distance'] / 1000:.1f} km",
+                    "elevation_m": f"{r['elevation_gain']} m",
+                }
+            )
         return result
-    
+
 
 @tool
 def find_cycling_climb_articles(location: str, radius_km: int = 50) -> List[str]:
@@ -216,11 +209,11 @@ def find_cycling_climb_articles(location: str, radius_km: int = 50) -> List[str]
     """
     if not os.getenv("SERPAPI_KEY"):
         return ["SERPAPI_KEY environment variable not set."]
-    
+
     params = {
         "engine": "google",  # Use the general Google search engine
         "q": f"famous cycling climbs within {radius_km} km of {location} stats",
-        "api_key": os.getenv("SERPAPI_KEY")
+        "api_key": os.getenv("SERPAPI_KEY"),
     }
     search = GoogleSearch(params)
     results = search.get_dict()
@@ -229,58 +222,66 @@ def find_cycling_climb_articles(location: str, radius_km: int = 50) -> List[str]
     if not organic_results:
         return [f"No search results found for cycling climbs near {location}."]
 
-    
     return [result["link"] for result in organic_results[:3] if "link" in result]
 
 
 class Climb(BaseModel):
     name: str = Field(description="Name of the climb")
     location: Optional[str] = Field(description="Location of the climb")
-    distance_km: Optional[float] = Field(description="Distance of the climb in kilometers")
-    elevation_gain_m: Optional[int] = Field(description="Elevation gain of the climb in meters")
-    average_gradient: Optional[float] = Field(description="Average gradient of the climb in percentage")
-    max_gradient: Optional[float] = Field(default=None,
-                                          description="Maximum gradient of the climb in percentage")
-    
+    distance_km: Optional[float] = Field(
+        description="Distance of the climb in kilometers"
+    )
+    elevation_gain_m: Optional[int] = Field(
+        description="Elevation gain of the climb in meters"
+    )
+    average_gradient: Optional[float] = Field(
+        description="Average gradient of the climb in percentage"
+    )
+    max_gradient: Optional[float] = Field(
+        default=None, description="Maximum gradient of the climb in percentage"
+    )
+
+
 class ClimbList(BaseModel):
     climbs: List[Climb]
+
 
 @tool
 def scrape_and_extract_climb_stats(url: str) -> List[dict]:
     """Extract detailed climb statistics from ONE webpage URL at a time.
-    
+
     CRITICAL: This tool accepts ONLY ONE url parameter (a single string), NOT multiple URLs.
     You must call this tool separately for each URL you want to scrape.
-    
+
     Use this tool AFTER find_cycling_climb_articles returns URLs. For example:
     - If find_cycling_climb_articles returns 3 URLs
     - Call this tool 3 times (once per URL)
-    
+
     This extracts structured cycling climb data:
     - Climb names
-    - Distances in kilometers  
+    - Distances in kilometers
     - Elevation gain in meters
     - Average and maximum gradient percentages
-    
+
     Args:
         url (str): A SINGLE webpage URL string (e.g., 'https://example.com/climbs')
                   NOT a list like ['url1', 'url2']
-    
-    Returns: 
-        List[dict]: Climb dictionaries with keys: name, location, distance_km, 
+
+    Returns:
+        List[dict]: Climb dictionaries with keys: name, location, distance_km,
                    elevation_gain_m, average_gradient, max_gradient
     """
     # 1. Scrape the webpage content
     try:
-        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
         response.raise_for_status()
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
+        soup = BeautifulSoup(response.content, "html.parser")
+
         # Remove script and style elements
         for script_or_style in soup(["script", "style"]):
             script_or_style.decompose()
-            
-        text_content = soup.get_text(separator=' ', strip=True)
+
+        text_content = soup.get_text(separator=" ", strip=True)
         # Limit content size to avoid excessive token usage
         text_content = text_content[:8000]
 
@@ -288,17 +289,15 @@ def scrape_and_extract_climb_stats(url: str) -> List[dict]:
         return [f"Error fetching URL: {e}"]
 
     prompt = get_climb_extraction_prompt(
-        schema=ClimbList.schema_json(indent=2),
-        webpage_text=text_content
+        schema=ClimbList.schema_json(indent=2), webpage_text=text_content
     )
-    
+
     # --- Call Ollama ---
     response = ollama.chat(
-        model="mistral",
-        messages=[{"role": "user", "content": prompt}]
-        )
+        model="mistral", messages=[{"role": "user", "content": prompt}]
+    )
     output = response["message"]["content"].strip()
-    
+
     try:
         data = json.loads(output)
 
@@ -319,5 +318,3 @@ def scrape_and_extract_climb_stats(url: str) -> List[dict]:
     except json.JSONDecodeError:
         # If parsing fails, return raw output for inspection
         return ["Error parsing JSON from LLM output", output]
-
-

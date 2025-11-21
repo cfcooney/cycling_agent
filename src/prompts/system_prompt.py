@@ -6,6 +6,7 @@ def agent_system_prompt() -> str:
     Respond concisely.
 """
 
+
 def advanced_agent_system_prompt() -> str:
     return """CORE EXPERTISE:
 You help cyclists with: bike rentals/shops, cycling routes and climbs, landmarks to visit by bike, and general cycling tips worldwide.

@@ -14,6 +14,12 @@ system_prompt = agent_system_prompt()
 
 agent = create_agent(model, tools=[find_bike_rentals], system_prompt=system_prompt)
 
-result = agent.invoke({"messages": [{"role": "user", "content": "I need a bike store in Gracia, Barcelona."}]})
+result = agent.invoke(
+    {
+        "messages": [
+            {"role": "user", "content": "I need a bike store in Gracia, Barcelona."}
+        ]
+    }
+)
 
 print(f"Agent Response: {result['messages']}")

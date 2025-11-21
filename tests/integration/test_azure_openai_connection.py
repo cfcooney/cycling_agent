@@ -5,9 +5,12 @@ from langchain_openai import AzureChatOpenAI
 
 # Add src to path for imports
 import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src/models')))
 
-from azure_opanai_models import get_azure_openai_model
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src/models"))
+)
+
+from azure_openai_models import get_azure_openai_model
 
 load_dotenv()
 
@@ -22,13 +25,18 @@ class TestAzureOpenAIConnection:
         missing_vars = [var for var in required_vars if not os.getenv(var)]
 
         if missing_vars:
-            pytest.skip(f"Missing required environment variables: {', '.join(missing_vars)}")
+            pytest.skip(
+                f"Missing required environment variables: {', '.join(missing_vars)}"
+            )
 
-    @pytest.mark.parametrize("model_name", [
-        "gpt-35-turbo",
-        "gpt-4o",
-        "gpt-4o-mini",
-    ])
+    @pytest.mark.parametrize(
+        "model_name",
+        [
+            "gpt-35-turbo",
+            "gpt-4o",
+            "gpt-4o-mini",
+        ],
+    )
     def test_get_azure_openai_model_instantiation(self, check_environment, model_name):
         """Test that the model can be instantiated successfully."""
         model = get_azure_openai_model(model_name)
@@ -45,7 +53,7 @@ class TestAzureOpenAIConnection:
         response = model.invoke("Say 'Hello, World!' and nothing else.")
 
         assert response is not None
-        assert hasattr(response, 'content')
+        assert hasattr(response, "content")
         assert len(response.content) > 0
         assert "hello" in response.content.lower()
 
@@ -56,7 +64,9 @@ class TestAzureOpenAIConnection:
         original_key = os.environ.pop("AZURE_OPENAI_API_KEY", None)
 
         try:
-            with pytest.raises(ValueError, match="Missing Azure OpenAI environment variables"):
+            with pytest.raises(
+                ValueError, match="Missing Azure OpenAI environment variables"
+            ):
                 get_azure_openai_model("gpt-4o-mini")
         finally:
             # Restore environment variables
